@@ -1,0 +1,16 @@
+# Cached transcripts
+transcripts/
+
+# Environment
+.env
+
+# Binary
+ytsummary
+
+# IDE
+.idea/
+.vscode/
+*.swp
+
+# OS
+.DS_Store
