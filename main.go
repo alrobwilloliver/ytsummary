@@ -32,7 +32,6 @@ func main() {
 		Short: "Summarize YouTube videos from their transcripts",
 		Long: `A CLI tool that fetches YouTube video transcripts and generates summaries using an LLM.
 
-Requires yt-dlp to be installed for transcript extraction.
 Supports any OpenAI-compatible API for summarization.`,
 	}
 
@@ -106,13 +105,13 @@ func runSummarize(cmd *cobra.Command, args []string) error {
 	var transcript string
 	entry, err := getCachedTranscript(videoID, language)
 	if err != nil {
-		log("Not cached, fetching transcript via yt-dlp...")
+		log("Not cached, fetching transcript...")
 		transcript, err = fetchTranscript(url)
 		if err != nil {
 			return fmt.Errorf("failed to fetch transcript: %w", err)
 		}
 		log("Transcript fetched (%d chars)", len(transcript))
-		// Cache it (title not available from yt-dlp method yet)
+		// Cache it
 		if err := cacheTranscript(videoID, language, "", transcript); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: failed to cache transcript: %v\n", err)
 		} else {
@@ -151,13 +150,13 @@ func runTranscript(cmd *cobra.Command, args []string) error {
 	var transcript string
 	entry, err := getCachedTranscript(videoID, language)
 	if err != nil {
-		log("Not cached, fetching transcript via yt-dlp...")
+		log("Not cached, fetching transcript...")
 		transcript, err = fetchTranscript(url)
 		if err != nil {
 			return fmt.Errorf("failed to fetch transcript: %w", err)
 		}
 		log("Transcript fetched (%d chars)", len(transcript))
-		// Cache it (title not available from yt-dlp method yet)
+		// Cache it
 		if err := cacheTranscript(videoID, language, "", transcript); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: failed to cache transcript: %v\n", err)
 		} else {

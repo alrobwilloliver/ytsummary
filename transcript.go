@@ -1,13 +1,9 @@
 package main
 
 import (
-	"context"
 	"fmt"
-	"os"
-	"os/exec"
 	"regexp"
 	"strings"
-	"time"
 )
 
 // extractVideoID pulls the video ID from various YouTube URL formats
@@ -50,78 +46,13 @@ func extractVideoID(url string) (string, error) {
 	return "", fmt.Errorf("could not extract video ID from: %s", url)
 }
 
-// fetchTranscript uses yt-dlp to download the transcript/subtitles
+// fetchTranscript fetches transcript using direct HTTP scraping
 func fetchTranscript(url string) (string, error) {
-	// Check if yt-dlp is installed
-	if _, err := exec.LookPath("yt-dlp"); err != nil {
-		return "", fmt.Errorf("yt-dlp is not installed. Install with: apt install yt-dlp (Linux) or brew install yt-dlp (Mac)")
-	}
-
-	// Fetch subtitles with timeout
-	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
-	defer cancel()
-
-	// Build args - add cookies if file exists
-	args := []string{
-		"--skip-download",
-		"--write-auto-sub",
-		"--write-sub",
-		"--sub-lang", "en,en-US,en-GB",
-		"--output", "/tmp/ytsummary-%(id)s",
-	}
-
-	// Check for cookies file (try multiple locations)
-	cookiesPaths := []string{
-		"cookies.txt",
-		"/home/clawdbot/ytsummary/cookies.txt",
-	}
-	for _, cp := range cookiesPaths {
-		if _, err := os.Stat(cp); err == nil {
-			args = append(args, "--cookies", cp)
-			break
-		}
-	}
-
-	args = append(args, url)
-	cmd := exec.CommandContext(ctx, "yt-dlp", args...)
-
-	output, err := cmd.CombinedOutput()
-	if ctx.Err() == context.DeadlineExceeded {
-		return "", fmt.Errorf("yt-dlp timed out after 60 seconds")
-	}
+	result, err := fetchTranscriptDirect(url, "en")
 	if err != nil {
-		return "", fmt.Errorf("yt-dlp failed: %s\n%s", err, string(output))
+		return "", err
 	}
-
-	// Find and read the subtitle file
-	videoID, _ := extractVideoID(url)
-	subContent, err := findAndReadSubtitle(videoID)
-	if err != nil {
-		return "", fmt.Errorf("no subtitles available for this video: %w", err)
-	}
-
-	// Clean up the subtitle format to plain text
-	return cleanSRT(subContent), nil
-}
-
-// findAndReadSubtitle looks for the downloaded subtitle file
-func findAndReadSubtitle(videoID string) (string, error) {
-	patterns := []string{
-		fmt.Sprintf("/tmp/ytsummary-%s.en.vtt", videoID),
-		fmt.Sprintf("/tmp/ytsummary-%s.en-US.vtt", videoID),
-		fmt.Sprintf("/tmp/ytsummary-%s.en-GB.vtt", videoID),
-	}
-
-	for _, path := range patterns {
-		content, err := os.ReadFile(path)
-		if err == nil {
-			// Clean up the temp file
-			os.Remove(path)
-			return string(content), nil
-		}
-	}
-
-	return "", fmt.Errorf("subtitle file not found for video %s", videoID)
+	return result.Transcript, nil
 }
 
 // cleanSubtitles removes timestamps and formatting from VTT/SRT content
