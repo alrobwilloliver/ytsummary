@@ -193,18 +193,29 @@ func (p *ProxyPool) Next() string {
 - [x] Add `serve` command to CLI
 - [x] Create Dockerfile (Gap 20)
 
-### Phase 1: Core Scraper (v0.1)
-- [ ] Update ytsummary to use direct HTTP scraping instead of yt-dlp
-- [ ] Implement proper browser headers
-- [ ] Parse ytInitialPlayerResponse for transcript URLs
-- [ ] Handle edge cases (age-restricted, private, live streams)
-- [ ] Test locally first
+### Phase 1: Core Scraper (v0.1) ✓
+- [x] Update ytsummary to use direct HTTP scraping instead of yt-dlp
+- [x] Use YouTube innertube API with ANDROID client (bypasses age restrictions)
+- [x] Handle edge cases (age-restricted, private, live streams)
+- [x] Test locally - works for all video types
+- [x] Document approach in README
+
+**Datacenter Testing Results:**
+- ✅ Works locally (residential IP) for all tested videos
+- ⚠️ From datacenter: Some videos work (Rick Astley), others return "LOGIN_REQUIRED" with "Sign in to confirm you're not a bot"
+- YouTube detects datacenter IPs and applies stricter bot checks inconsistently
+- Different innertube clients (WEB, IOS, TVHTML5) don't bypass this - it's IP-based
 
 ### Phase 2: Proxy Support (v0.2)
-- [ ] Add proxy configuration to scraper
-- [ ] Implement proxy rotation
+- [ ] Add proxy configuration to scraper (HTTP_PROXY env var)
+- [ ] Implement proxy rotation with fallback
 - [ ] Add retry logic with exponential backoff
-- [ ] Test with single Squid proxy
+- [ ] Test options:
+  - [ ] Self-hosted Squid proxy on different datacenter IP (likely blocked)
+  - [ ] Residential proxy service (higher cost, more reliable)
+  - [ ] Hybrid: try direct first, fall back to proxy
+
+**Key insight from Phase 1 testing:** Datacenter IP blocking is IP-based, not client-based. Different innertube clients don't help - need residential IPs or accept partial success rate.
 
 ### Phase 3: Infrastructure (v0.3)
 - [ ] Create DigitalOcean container registry via Terraform (Gap 15)

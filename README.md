@@ -47,6 +47,20 @@ All popular transcript tools (yt-dlp, youtube-transcript-api, etc.) use variatio
 | Members-only content | ❌ Requires login (not supported) |
 | Live streams | ❌ Blocked (no complete captions) |
 | Videos without captions | ❌ Returns error |
+| **Datacenter IPs** | ⚠️ Partial - some videos blocked with "Sign in to confirm you're not a bot" |
+
+### Datacenter IP Blocking
+
+When running from a datacenter (DigitalOcean, AWS, etc.), YouTube may return "LOGIN_REQUIRED" errors for some videos while allowing others. This is bot detection based on IP reputation, not the video content.
+
+**Observations:**
+- Popular music videos tend to work more reliably
+- Switching innertube clients (WEB, IOS) doesn't help - it's IP-based
+- Works 100% from residential IPs
+
+**Workarounds being investigated:**
+- Residential proxy services
+- Self-hosted proxies on residential connections
 
 ### Risks
 
