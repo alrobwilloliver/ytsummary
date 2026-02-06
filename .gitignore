@@ -1,8 +1,11 @@
-# Cached transcripts
+# Cache (SQLite database)
+cache/
 transcripts/
 
-# Environment
+# Environment & secrets
 .env
+*.env
+cookies.txt
 
 # Binary
 ytsummary
@@ -14,3 +17,13 @@ ytsummary
 
 # OS
 .DS_Store
+
+# Terraform
+terraform/.terraform/
+terraform/*.tfstate
+terraform/*.tfstate.backup
+terraform/*.tfvars
+terraform/.terraform.lock.hcl
+
+# Test artifacts
+coverage.out

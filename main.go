@@ -15,11 +15,16 @@ func init() {
 
 var (
 	// Config flags
-	cacheDir   string
-	llmModel   string
-	llmAPIKey  string
-	llmBaseURL string
+	cacheDir     string
+	llmModel     string
+	llmAPIKey    string
+	llmBaseURL   string
+	language     string
+	serverAddr   string
+	serverAPIKey string
 )
+
+const defaultLanguage = "en"
 
 func main() {
 	rootCmd := &cobra.Command{
@@ -47,14 +52,33 @@ Supports any OpenAI-compatible API for summarization.`,
 		RunE:  runTranscript,
 	}
 
+	// Serve command (HTTP API server)
+	serveCmd := &cobra.Command{
+		Use:   "serve",
+		Short: "Start the HTTP API server",
+		Long: `Start an HTTP server exposing the transcript and summarization API.
+
+Endpoints:
+  GET  /health     - Health check
+  POST /transcript - Fetch transcript only
+  POST /summarize  - Fetch transcript and summarize
+
+Set YTSUMMARY_SERVER_API_KEY or use --server-api-key to require authentication.`,
+		RunE: runServe,
+	}
+	serveCmd.Flags().StringVar(&serverAddr, "addr", ":8080", "Server listen address")
+	serveCmd.Flags().StringVar(&serverAPIKey, "server-api-key", "", "API key for authentication (default: from YTSUMMARY_SERVER_API_KEY env)")
+
 	// Global flags
-	rootCmd.PersistentFlags().StringVar(&cacheDir, "cache-dir", "./transcripts", "Directory to cache transcripts")
+	rootCmd.PersistentFlags().StringVar(&cacheDir, "cache-dir", "./cache", "Directory for SQLite cache database")
 	rootCmd.PersistentFlags().StringVar(&llmModel, "model", "", "LLM model to use (default: from YTSUMMARY_MODEL env)")
 	rootCmd.PersistentFlags().StringVar(&llmAPIKey, "api-key", "", "LLM API key (default: from YTSUMMARY_API_KEY env)")
 	rootCmd.PersistentFlags().StringVar(&llmBaseURL, "api-url", "", "LLM API base URL (default: from YTSUMMARY_API_URL env)")
+	rootCmd.PersistentFlags().StringVar(&language, "lang", defaultLanguage, "Preferred transcript language (e.g., en, es, fr)")
 
 	rootCmd.AddCommand(summarizeCmd)
 	rootCmd.AddCommand(transcriptCmd)
+	rootCmd.AddCommand(serveCmd)
 
 	if err := rootCmd.Execute(); err != nil {
 		fmt.Fprintln(os.Stderr, err)
@@ -68,6 +92,7 @@ func log(format string, args ...interface{}) {
 
 func runSummarize(cmd *cobra.Command, args []string) error {
 	url := args[0]
+	defer closeCache()
 
 	log("Parsing URL...")
 	videoID, err := extractVideoID(url)
@@ -77,8 +102,9 @@ func runSummarize(cmd *cobra.Command, args []string) error {
 	log("Video ID: %s", videoID)
 
 	// Check cache first
-	log("Checking cache...")
-	transcript, err := getCachedTranscript(videoID)
+	log("Checking cache for language '%s'...", language)
+	var transcript string
+	entry, err := getCachedTranscript(videoID, language)
 	if err != nil {
 		log("Not cached, fetching transcript via yt-dlp...")
 		transcript, err = fetchTranscript(url)
@@ -86,13 +112,14 @@ func runSummarize(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to fetch transcript: %w", err)
 		}
 		log("Transcript fetched (%d chars)", len(transcript))
-		// Cache it
-		if err := cacheTranscript(videoID, transcript); err != nil {
+		// Cache it (title not available from yt-dlp method yet)
+		if err := cacheTranscript(videoID, language, "", transcript); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: failed to cache transcript: %v\n", err)
 		} else {
 			log("Cached transcript")
 		}
 	} else {
+		transcript = entry.Transcript
 		log("Found cached transcript (%d chars)", len(transcript))
 	}
 
@@ -110,6 +137,7 @@ func runSummarize(cmd *cobra.Command, args []string) error {
 
 func runTranscript(cmd *cobra.Command, args []string) error {
 	url := args[0]
+	defer closeCache()
 
 	log("Parsing URL...")
 	videoID, err := extractVideoID(url)
@@ -119,8 +147,9 @@ func runTranscript(cmd *cobra.Command, args []string) error {
 	log("Video ID: %s", videoID)
 
 	// Check cache first
-	log("Checking cache...")
-	transcript, err := getCachedTranscript(videoID)
+	log("Checking cache for language '%s'...", language)
+	var transcript string
+	entry, err := getCachedTranscript(videoID, language)
 	if err != nil {
 		log("Not cached, fetching transcript via yt-dlp...")
 		transcript, err = fetchTranscript(url)
@@ -128,17 +157,30 @@ func runTranscript(cmd *cobra.Command, args []string) error {
 			return fmt.Errorf("failed to fetch transcript: %w", err)
 		}
 		log("Transcript fetched (%d chars)", len(transcript))
-		// Cache it
-		if err := cacheTranscript(videoID, transcript); err != nil {
+		// Cache it (title not available from yt-dlp method yet)
+		if err := cacheTranscript(videoID, language, "", transcript); err != nil {
 			fmt.Fprintf(os.Stderr, "warning: failed to cache transcript: %v\n", err)
 		} else {
 			log("Cached transcript")
 		}
 	} else {
+		transcript = entry.Transcript
 		log("Found cached transcript (%d chars)", len(transcript))
 	}
 
 	log("Done!\n")
 	fmt.Println(transcript)
 	return nil
+}
+
+func runServe(cmd *cobra.Command, args []string) error {
+	defer closeCache()
+
+	// Get API key from flag or environment
+	apiKey := serverAPIKey
+	if apiKey == "" {
+		apiKey = os.Getenv("YTSUMMARY_SERVER_API_KEY")
+	}
+
+	return startServer(serverAddr, apiKey)
 }

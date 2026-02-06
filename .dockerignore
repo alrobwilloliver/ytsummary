@@ -1,0 +1,30 @@
+# Git
+.git
+.gitignore
+
+# IDE
+.idea
+.vscode
+*.swp
+*.swo
+
+# Local files
+.env
+*.env
+cookies.txt
+transcripts/
+cache/
+
+# Documentation
+*.md
+!README.md
+
+# Terraform (will be in separate dir)
+terraform/
+*.tf
+*.tfvars
+*.tfstate*
+
+# Test artifacts
+*_test.go
+coverage.out

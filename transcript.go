@@ -11,9 +11,27 @@ import (
 )
 
 // extractVideoID pulls the video ID from various YouTube URL formats
+// Supported formats:
+//   - youtube.com/watch?v=VIDEO_ID
+//   - youtu.be/VIDEO_ID
+//   - youtube.com/embed/VIDEO_ID
+//   - youtube.com/v/VIDEO_ID
+//   - youtube.com/shorts/VIDEO_ID
+//   - youtube.com/live/VIDEO_ID
+//   - m.youtube.com/watch?v=VIDEO_ID
+//   - With extra params: ?v=VIDEO_ID&t=123
 func extractVideoID(url string) (string, error) {
 	patterns := []string{
-		`(?:youtube\.com/watch\?v=|youtu\.be/|youtube\.com/embed/|youtube\.com/v/)([a-zA-Z0-9_-]{11})`,
+		// Standard watch URL (including mobile)
+		`(?:m\.)?youtube\.com/watch\?v=([a-zA-Z0-9_-]{11})`,
+		// Short URL
+		`youtu\.be/([a-zA-Z0-9_-]{11})`,
+		// Embed and legacy URLs
+		`youtube\.com/(?:embed|v)/([a-zA-Z0-9_-]{11})`,
+		// Shorts
+		`youtube\.com/shorts/([a-zA-Z0-9_-]{11})`,
+		// Live streams
+		`youtube\.com/live/([a-zA-Z0-9_-]{11})`,
 	}
 
 	for _, pattern := range patterns {
@@ -43,14 +61,29 @@ func fetchTranscript(url string) (string, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 60*time.Second)
 	defer cancel()
 
-	cmd := exec.CommandContext(ctx, "yt-dlp",
+	// Build args - add cookies if file exists
+	args := []string{
 		"--skip-download",
 		"--write-auto-sub",
 		"--write-sub",
 		"--sub-lang", "en,en-US,en-GB",
 		"--output", "/tmp/ytsummary-%(id)s",
-		url,
-	)
+	}
+
+	// Check for cookies file (try multiple locations)
+	cookiesPaths := []string{
+		"cookies.txt",
+		"/home/clawdbot/ytsummary/cookies.txt",
+	}
+	for _, cp := range cookiesPaths {
+		if _, err := os.Stat(cp); err == nil {
+			args = append(args, "--cookies", cp)
+			break
+		}
+	}
+
+	args = append(args, url)
+	cmd := exec.CommandContext(ctx, "yt-dlp", args...)
 
 	output, err := cmd.CombinedOutput()
 	if ctx.Err() == context.DeadlineExceeded {
